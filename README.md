@@ -4,52 +4,43 @@ This repo is the official implementation for FAFormer: Frequency-Analysis-Based 
 
 
 
-## Architecture of FAFormer
+## Architecture
 
 ![FAFormer](pic/FAFormer.jpg)
 
 
 
-# IAB
+## IAB
 
 ![IAB](pic/IAB.jpg)
 
 
 
-# CFAM
+## CFAM
 
 ![CFAM](pic/CFAM.jpg)
 
 
 
-# SFAM
+## SFAM
 
 ![SFAM](pic/SFAM.jpg)
 
 
 
-# Prerequisites
+## Prerequisites
 
 This environment is mainly based on python=3.6 with CUDA=10.2
 
 ```shell
 conda create -n faformer python=3.6
 conda activate faformer
-conda install pytorch=1.7.1 torchvision=0.2.2 cudatoolkit=10.2
-pip install mmcv==1.2.7
-conda install gdal=3.1.0 -c conda-forge
-conda install scikit-image=0.17.2
-pip install scipy==1.5.3
-pip install gpustat==0.6.0
-pip install numba==0.53.1 
-pip install einops==0.3.0 
-pip install timm==0.3.2
-pip install sewar==0.4.4
+pip install -r requirements.txt
 ```
 
 
 
-# Test with the pretrained Model
+## Test with the pretrained Model
 
 Due to the large size of the dataset, we only provide some samples in './data' to verify the code.
 
@@ -60,4 +51,44 @@ python main.py -c configs/faformer.py
 ```
 
 You can modify the config file 'configs/faformer.py' for different purposes.
+
+
+
+## Visualize the training process
+
+The training process can be visualized using the TensorBoard library. It is saved under the directory '/runs'.
+```shell
+tensorboard --logdir=runs/
+```
+
+
+
+## Useful tools
+
+We have provided several useful tools in the '/tools' folder.
+
+
+
+### Preprocessing
+
+The original remote sensing images include large-sized MS images and their corresponding PAN images. We need to generate MS, PAN, and GT images according to the Wald protocol and then cut these images into smaller patches. 
+```shell
+python tools/handle_raw.py
+python tools/clip_patch.py
+```
+
+
+
+### Visualization
+
+We convert the .tif files to .png files for visualization and merge the multiple cropped patches back into the original large image.
+```shell
+python tools/visualization.py
+```
+
+
+
+## Credits
+
+The code of this repository partly relies on [UCGAN](https://github.com/zhysora/UCGAN) and [PanFormer](https://github.com/zhysora/PanFormer). I would like to show my sincere gratitude to authors of them.
 

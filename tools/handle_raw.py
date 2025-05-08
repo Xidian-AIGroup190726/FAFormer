@@ -6,15 +6,15 @@ import cv2
 import argparse
 import mmcv
 import sys
-sys.path.append('.')
+sys.path.append('')
 from datasets.utils import save_image
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description='handle raw images')
-    parser.add_argument('-d', '--data_dir', required=True, help='root of data directory')
-    parser.add_argument('-s', '--satellite', required=True, help='name of the satellite/dataset')
-    parser.add_argument('-n', required=True, type=int, help='total number of images pairs')
+    parser.add_argument('-d', '--data_dir', default='', help='root of data directory')
+    parser.add_argument('-s', '--satellite', default='GF-1', help='name of the satellite/dataset')
+    parser.add_argument('-n', default='', type=int, help='total number of images pairs')
     parser.add_argument('-m', '--mode', choices=['Gaussian', 'Bicubic'], default='Gaussian',
                         help='type of interpolation')
     parser.add_argument('--reduce_raw', action='store_true',

@@ -8,8 +8,8 @@ import os.path as osp
 import cv2
 import numpy as np
 
-from datasets.utils import save_image, data_augmentation, data_denormalize
-from .common.utils import torch2np, dwt2d, smart_time, set_batch_cuda, up_sample
+from datasets.utils import save_image, data_augmentation
+from .common.utils import torch2np, dwt2d, smart_time, set_batch_cuda
 from .common.losses import get_loss_module
 from .common import metrics as mtc
 from torch.utils.tensorboard import SummaryWriter
@@ -121,6 +121,21 @@ class Base_model:
             module = self.module_dict[module_name]
             module.load_state_dict(checkpoint[module_name].state_dict())
 
+    # def load_pretrained(self, path: str):
+    #     checkpoint = torch.load(path)
+    #     ck_state_dict = checkpoint['core_module']
+    #
+    #     for module_name in self.module_dict:
+    #         module = self.module_dict[module_name]
+    #         load_info = module.load_state_dict(ck_state_dict, strict=False)
+    #
+    #         print("Missing keys:", load_info.missing_keys)  # 'ms_KV_cross_attn.0.layers.0.0.attention_block.fn.fn.iab.alpha.bottleneckBlock.0.weight'
+    #         print("Unexpected keys:", load_info.unexpected_keys)
+    #         num_loaded = len(ck_state_dict) - len(load_info.unexpected_keys)
+    #         print("Successfully loaded params:", num_loaded)
+    #         print("Total in ck_state_dict:", len(ck_state_dict))
+    #         print("Total missing in module:", len(load_info.missing_keys))
+
     def set_optim(self):
         optim_cfg = self.cfg.get('optim_cfg', {})
         for module_name in self.module_dict:
@@ -164,9 +179,6 @@ class Base_model:
         pass
 
     def train(self):
-        # save_freq: every n iterations to save the weights of model
-        # test_freq: every n iterations to save the results of the testing set
-        # eval_freq: every n iterations to eval the model on testing set, require test_freq = k * eval_freq
         for freq_str in ['save_freq', 'test_freq', 'eval_freq']:
             self.cfg.setdefault(freq_str, 10000)
         self.cfg.setdefault('max_iter', 100000)
@@ -181,8 +193,6 @@ class Base_model:
                 if 'aug_dict' in self.cfg:
                     input_batch = data_augmentation(input_batch, self.cfg.aug_dict)
                 iter_id += 1
-                # .train()用于在训练神经网络时启用dropout、batch
-                # normalization和其他特定于训练的操作的函数。这个方法会通知模型进行反向传播，并更新模型的权重和偏差。
                 for module in self.module_dict.values():
                     module.train()
                 self.before_train_iter()
@@ -279,33 +289,16 @@ class Base_model:
             self.logger.info(f'===> training iteration[{iter_id}/{self.cfg.max_iter}] '
                              f'lr: {self.optim_dict["core_module"].param_groups[0]["lr"]:.6f}, '
                              f'ETA: {smart_time(remain_time)}')
-            # self.logger.info(f'full loss: {loss_res["full_loss"]:.6f}')
             for loss_name in loss_res:
-                if 'ms_adv_loss' in loss_name:
-                    self.logger.info(f'{loss_name}_{self.loss_module[loss_name].get_type()}: '
-                                     f'(G:{loss_res[loss_name][0]:.6f}, D:{loss_res[loss_name][1]:.6f})')
-                    # print(f'{loss_name}_{self.loss_module[loss_name].get_type()}: '
-                    #                  f'(G:{loss_res[loss_name][0]:.6f}, D:{loss_res[loss_name][1]:.6f})')
-
-                if 'pan_adv_loss' in loss_name:
-                    self.logger.info(f'{loss_name}_{self.loss_module[loss_name].get_type()}: '
-                                     f'(G:{loss_res[loss_name][0]:.6f}, D:{loss_res[loss_name][1]:.6f})')
-                    # print(f'{loss_name}_{self.loss_module[loss_name].get_type()}: '
-                    #                  f'(G:{loss_res[loss_name][0]:.6f}, D:{loss_res[loss_name][1]:.6f})')
-
                 if 'rec_loss' in loss_name:
                     self.logger.info(f'{loss_name}_{self.loss_module[loss_name].get_type()}: '
                                      f'{loss_res[loss_name]:.6f}')
-                    # print(f'{loss_name}_{self.loss_module[loss_name].get_type()}: '
-                    #                  f'{loss_res[loss_name]:.6f}')
 
                 if 'QNR_loss' in loss_name:
                     self.logger.info(f'QNR_loss: {loss_res[loss_name]:.6f}')
-                    # print(f'QNR_loss: {loss_res[loss_name]:.6f}')
 
                 if 'full_loss' in loss_name:
                     self.logger.info(f'full_loss: {loss_res[loss_name]:.6f}')
-                    # print(f'full_loss: {loss_res[loss_name]:.6f}')
 
     def test(self, iter_id, save, ref):
         r""" test and evaluate the model
@@ -340,14 +333,6 @@ class Base_model:
             tot_count += n
 
             Core = self.module_dict['core_module']
-            # print("alpha in test:", G_core.alpha_parameter.data)
-            # G_ms = self.module_dict['ms_module']
-            # G_pan = self.module_dict['pan_module']
-
-            # 加载alpha
-            # if Core.alpha_parameter is not None:
-            #     alpha = Core.alpha_parameter.item()
-            #     Core.updateAlpha(alpha)
 
             timer = mmcv.Timer()
             with torch.no_grad():
@@ -365,13 +350,6 @@ class Base_model:
             if ref:
                 target = torch2np(input_batch['target'])
             output_np = torch2np(output)
-
-            # if 'norm_input' in self.cfg and self.cfg.norm_input:
-            #     input_pan = data_denormalize(input_pan, self.cfg.bit_depth)
-            #     input_lr = data_denormalize(input_lr, self.cfg.bit_depth)
-            #     if ref:
-            #         target = data_denormalize(target, self.cfg.bit_depth)
-            #     output = data_denormalize(output, self.cfg.bit_depth)
 
             for i in range(n):
 

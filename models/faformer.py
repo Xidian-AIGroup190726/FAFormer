@@ -1,13 +1,11 @@
 import torch
 import torch.nn as nn
 from logging import Logger
-from mmcv import Config
-import numpy as np
 
 from .base_model import Base_model
 from .builder import MODELS
 from .common.utils import up_sample, dwt2d, data_normalize, data_denormalize
-from .common.modules import ResBlock, conv3x3, SwinModule, conv1x1
+from .common.modules import conv3x3, SwinModule, conv1x1
 
 class Transformer(nn.Module):
     def __init__(self, self_attention=True, input_chans=4, n_feats=32, n_blocks=1, downscaling_factor=1, n_heads=4, head_dim=16, win_size=4):
@@ -29,16 +27,11 @@ class Transformer(nn.Module):
 
 
 class RestoreNet(nn.Module):
-    def __init__(self, logger: Logger, ms_chans, n_feats=32, norm_type='BN', basic_block=ResBlock):
+    def __init__(self, ms_chans, n_feats=32):
             super(RestoreNet, self).__init__()
 
             # 图像恢复
             self.HR_tail = nn.Sequential(
-                # conv3x3(n_feats, n_feats * 4),
-                # # nn.PixelShuffle:用于对输入张量进行像素重排(上采样)
-                # nn.PixelShuffle(2),
-                # nn.ReLU(True),
-
                 conv3x3(n_feats * 3, n_feats * 4),
                 nn.PixelShuffle(2),
                 nn.ReLU(True),
@@ -50,13 +43,13 @@ class RestoreNet(nn.Module):
         return x
 
 class Branch(nn.Module):
-    def __init__(self, n_feats=32, n_block=1, h_attn=True, inn_iter=1):
+    def __init__(self, n_feats=32, n_block=1, h_attn=True, iab_iter=1):
         super(Branch, self).__init__()
         self.n_block = n_block
         self.attn = nn.ModuleList()
         self.conv = nn.ModuleList()
         for _ in range(self.n_block):
-            self.attn.append(SwinModule(in_channels=n_feats, hidden_dimension=n_feats, cross_attn=True, h_attn=h_attn, inn_iter=inn_iter))
+            self.attn.append(SwinModule(in_channels=n_feats, hidden_dimension=n_feats, cross_attn=True, h_attn=h_attn, iab_iter=iab_iter))
         for _ in range(self.n_block-1):
             self.conv.append(conv3x3(n_feats, n_feats))
     def forward(self, x, h):
@@ -72,7 +65,7 @@ class Branch(nn.Module):
         return result
 
 class Core_Module(nn.Module):
-    def __init__(self, logger, ms_chans=4, n_feats=32, norm_input=True, bit_depth=10, norm_type='BN', n_blocks=(1, 1, 3), inn_iters=(2,1)):
+    def __init__(self, logger, ms_chans=4, n_feats=32, norm_input=True, bit_depth=10, norm_type='BN', n_blocks=(1, 1, 3), iab_iters=(2,1)):
         super(Core_Module, self).__init__()
 
         self.norm_input = norm_input
@@ -94,13 +87,13 @@ class Core_Module(nn.Module):
         self.conv2 = conv1x1(n_feats*3, n_feats)
 
         for _ in range(n_blocks[0]):
-            self.ms_KV_cross_attn.append(SwinModule(in_channels=n_feats, hidden_dimension=n_feats, cross_attn=True, h_attn=False, inn_iter=inn_iters[0]))
-            self.pan_KV_cross_attn.append(SwinModule(in_channels=n_feats, hidden_dimension=n_feats, cross_attn=True, h_attn=False, inn_iter=inn_iters[0]))
+            self.ms_KV_cross_attn.append(SwinModule(in_channels=n_feats, hidden_dimension=n_feats, cross_attn=True, h_attn=False, iab_iter=iab_iters[0]))
+            self.pan_KV_cross_attn.append(SwinModule(in_channels=n_feats, hidden_dimension=n_feats, cross_attn=True, h_attn=False, iab_iter=iab_iters[0]))
 
-        self.l_ms_attn = Branch(n_feats=n_feats, n_block=n_blocks[1], h_attn=True, inn_iter=inn_iters[1])
-        self.h_pan_attn = Branch(n_feats=n_feats, n_block=n_blocks[2], h_attn=True, inn_iter=inn_iters[1])
+        self.l_ms_attn = Branch(n_feats=n_feats, n_block=n_blocks[1], h_attn=True, iab_iter=iab_iters[1])
+        self.h_pan_attn = Branch(n_feats=n_feats, n_block=n_blocks[2], h_attn=True, iab_iter=iab_iters[1])
 
-        self.ResBlock = RestoreNet(logger, ms_chans, n_feats, norm_type)
+        self.ResBlock = RestoreNet(ms_chans, n_feats)
 
     def forward(self, x_ms, x_pan):
 
@@ -167,5 +160,3 @@ class FAFormer(Base_model):
 
         Core_cfg = model_cfg.get('core_module', dict())
         self.add_module('core_module', Core_Module(logger=logger, ms_chans=ms_chans, n_feats=n_feats, **Core_cfg))
-
-        self.to_pan_mode = model_cfg.get('to_pan_mode', 'max')

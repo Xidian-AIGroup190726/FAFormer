@@ -6,14 +6,14 @@ import mmcv
 import numpy as np
 import argparse
 import sys
-sys.path.append('.')
+sys.path.append('')
 from datasets.utils import save_image
 
 
 def parse_args():
     parser = argparse.ArgumentParser(description='clip into patches')
     parser.add_argument('-d', '--data_dir', required=False, default='', help='root of data directory')
-    parser.add_argument('-s', '--satellite', required=False, default='WV-3', help='name of the satellite/dataset')
+    parser.add_argument('-s', '--satellite', required=False, default='GF-1', help='name of the satellite/dataset')
     parser.add_argument('-n', required=False, default=3, type=int, help='total number of images pairs')
     parser.add_argument('-p', '--patch_num', required=False, default=5000, type=int,   # 每张图片的patch_num
                         help='random clip how many patches for one training scene')
