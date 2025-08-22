@@ -46,7 +46,7 @@ Due to the large size of the dataset, we only provide some samples in './data' t
 
 ```shell
 conda activate faformer
-export CUDA_VISIBLE_DEVICES='0';
+export CUDA_VISIBLE_DEVICES='0'
 python main.py -c configs/faformer.py
 ```
 
